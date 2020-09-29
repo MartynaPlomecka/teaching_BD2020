@@ -1,16 +1,16 @@
 ---
 title: "Regularization"
-author: "Big Data in Psychology"
+author: "Big Data in Psychology, Martyna Płomecka"
 date: "9/28/2020"
 output: pdf_document
 ---
 ### Load libraries, get data & set seed for reproducibility
 ```{r setup}
-set.seed(222)    # seef for reproducibility
+set.seed(222)    # seed for reproducibility
 library(glmnet)  # for ridge regression
 library(dplyr)   # for data cleaning
 library(psych)   # for function tr() to compute trace of a matrix
-data("mtcars")
+data("mtcars") #loading data
 ```
 
 ## RIDGE REGRESSION
@@ -29,14 +29,17 @@ We scale the X matrix to ensure that the penalty term penalizes each coefficient
 ### Perform 10-fold cross-validation to select lambda:
 ```{r}
 lambdas_to_try <- 10^seq(-3, 5, length.out = 100)
-#10-fold cross-validation to sel ect lambda
+#10-fold cross-validation to select lambda
 
 # Setting alpha = 0 implements ridge regression
 ridge_cv <- cv.glmnet(X, y, alpha = 0, lambda = lambdas_to_try,
                       standardize = TRUE, nfolds = 10)
+#function cv.glmnet does k-fold cross-validation for glmnet, 
+#produces a plot, and returns a value for lambda
+
+
 # Plot cross-validation results
 plot(ridge_cv)
-
 # Best cross-validated lambda
 lambda_cv <- ridge_cv$lambda.min
 # Fit final model, get its sum of squared residuals and multiple R-squared
@@ -68,10 +71,10 @@ for (lambda in seq(lambdas_to_try)) {
 }
 
 # Plot information criteria against tried values of lambdas
-plot(log(lambdas_to_try), aic, col = "orange", type = "l",
+plot(log(lambdas_to_try), aic, col = "red", type = "l",
      ylim = c(190, 260), ylab = "Information Criterion")
-lines(log(lambdas_to_try), bic, col = "skyblue3")
-legend("bottomright", lwd = 1, col = c("orange", "skyblue3"), legend = c("AIC", "BIC"))
+lines(log(lambdas_to_try), bic, col = "blue")
+legend("bottomright", lwd = 1, col = c("red", "blue"), legend = c("AIC", "BIC"))
 
 # Optimal lambdas according to both criteria
 lambda_aic <- lambdas_to_try[which.min(aic)]
@@ -142,14 +145,26 @@ rsq <- cbind("R-squared" = c(rsq_ridge_cv, rsq_ridge_aic, rsq_ridge_bic, rsq_las
 rownames(rsq) <- c("ridge cross-validated", "ridge AIC", "ridge BIC", "lasso cross_validated")
 print(rsq)
 ```
-## ELASTIC NET
 
+Some more general considerations about how ridge and lasso compare:
+
+* Often neither one is overall better.
+* Lasso can set some coefficients to zero, thus performing variable selection, while ridge regression cannot.
+* Both methods allow to use correlated predictors, but they solve multicollinearity issue differently:
+* In ridge regression, the coefficients of correlated predictors are similar;
+* In lasso, one of the correlated predictors has a larger coefficient, while the rest are (nearly) zeroed.
+* Lasso tends to do well if there are a small number of significant parameters and the others are close to zero (ergo: when only a few predictors actually influence the response).
+* Ridge works well if there are many large parameters of about the same value (ergo: when most predictors impact the response).
+
+(However, in practice, we don't know the true parameter values, so the previous two points are somewhat theoretical. Just run cross-validation to select the more suited model for a specific case)
+
+## ELASTIC NET
+(optional task)
 Elastic Net first emerged as a result of critique on lasso, whose variable selection can be too dependent on data and thus unstable.
 The solution is to combine the penalties of ridge regression and lasso to get the best of both worlds:
-
-
 ```{r, include=FALSE}
 library(caret)
+#Linear regression with combined L1 and L2 priors as regularizer.
 
 # Set training control
 train_control <- trainControl(method = "repeatedcv",
@@ -168,7 +183,7 @@ elastic_net_model <- train(mpg ~ .,
 ```
 Check multiple R-squared:
 ```{r}
-y_hat_enet <- predict(elastic_net_model, X)
+y_hat_enet <- predict(elastic_net_model, X) 
 y_hat_enet
 rsq_enet <- cor(y, y_hat_enet)^2
 rsq_enet

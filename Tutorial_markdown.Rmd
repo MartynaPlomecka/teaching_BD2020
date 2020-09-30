@@ -1,9 +1,22 @@
 ---
-title: "Regularization"
+title: "Regularization Tutorial"
 author: "Big Data in Psychology, Martyna Płomecka"
-date: "9/28/2020"
+date: "9/30/2020"
 output: pdf_document
 ---
+
+
+Motivation:
+In statistics, there are two critical characteristics of estimators to be considered: the bias and the variance:
+
+Bias measures the accuracy of the estimates.
+
+Variance measures the spread, or uncertainty, in these estimates.
+
+
+Regularization - the aproach which reduces the variance at the cost of introducing some bias.
+(Almost always beneficial for the predictive performance of the model.)
+
 ### Load libraries, get data & set seed for reproducibility
 ```{r setup}
 set.seed(222)    # seed for reproducibility
@@ -14,17 +27,27 @@ data("mtcars") #loading data
 ```
 
 ## RIDGE REGRESSION
+
 ```{r}
 #1. RIDGE REGRESSION
+#->decreasing model complexity while keeping all variables in the model
+
+#first, centering:
 # Center y, X will be standardized in the modelling function 
 #(ridge regression assumes the predictors are standardized and the response is centered)
 y <- mtcars %>% select(mpg) %>% scale(center = TRUE, scale = FALSE) %>% as.matrix()
 X <- mtcars %>% select(-mpg) %>% as.matrix()
 ```
-Explanation:
-We scale the X matrix to ensure that the penalty term penalizes each coefficient equally. Instead of solving this heteroskedasticity problem by equalizing the variances of all predictors via scaling, we could just as well use them as weights in the estimation process! This is the idea behind the Differentially-weighted or Heteroskedastic Ridge Regression.
+
+In Ridge Regression, the OLS loss function is augmented in such a way that we not only minimize the sum of squared residuals but also penalize the size of parameter estimates, in order to shrink them towards zero.
 
 
+## Choice of Regularization Parameter:
+There are two ways we could tackle this issue. A more traditional approach would be to choose lambda such that some information criterion, e.g., AIC or BIC, is the smallest.
+
+A more machine learning-like approach is to perform cross-validation and select the value of lambda that minimizes the cross-validated sum of squared residuals (or some other measure).
+
+The former approach emphasizes the model's fit to the data, while the latter is more focused on its predictive performance. 
 
 ### Perform 10-fold cross-validation to select lambda:
 ```{r}
@@ -38,6 +61,7 @@ ridge_cv <- cv.glmnet(X, y, alpha = 0, lambda = lambdas_to_try,
 #produces a plot, and returns a value for lambda
 
 
+
 # Plot cross-validation results
 plot(ridge_cv)
 # Best cross-validated lambda
@@ -45,9 +69,9 @@ lambda_cv <- ridge_cv$lambda.min
 # Fit final model, get its sum of squared residuals and multiple R-squared
 model_cv <- glmnet(X, y, alpha = 0, lambda = lambda_cv, standardize = TRUE)
 y_hat_cv <- predict(model_cv, X)
-ssr_cv <- t(y - y_hat_cv) %*% (y - y_hat_cv)
-rsq_ridge_cv <- cor(y, y_hat_cv)^2
-rsq_ridge_cv
+ssr_cv <- t(y - y_hat_cv) %*% (y - y_hat_cv) #compute a sum of squared residuals
+rsq_ridge_cv <- cor(y, y_hat_cv)^2 #Multiple R squared
+
 ```
 
 ### Use information criteria to select lambda:
@@ -122,9 +146,10 @@ plot(lasso_cv)
 lambda_cv <- lasso_cv$lambda.min
 # Fit final model, get its sum of squared residuals and multiple R-squared
 model_cv <- glmnet(X, y, alpha = 1, lambda = lambda_cv, standardize = TRUE)
-y_hat_cv <- predict(model_cv, X)
-ssr_cv <- t(y - y_hat_cv) %*% (y - y_hat_cv)
-rsq_lasso_cv <- cor(y, y_hat_cv)^2
+y_hat_cv <- predict(model_cv, X)#predict  data
+ssr_cv <- t(y - y_hat_cv) %*% (y - y_hat_cv) #compute a sum of squared residuals
+rsq_lasso_cv <- cor(y, y_hat_cv)^2 #Multiple R squared
+#(actually can be viewed as the correlation between response and the fitted values. 
 
 ```
 
@@ -159,8 +184,12 @@ Some more general considerations about how ridge and lasso compare:
 
 (However, in practice, we don't know the true parameter values, so the previous two points are somewhat theoretical. Just run cross-validation to select the more suited model for a specific case)
 
-## ELASTIC NET
+
+
 (optional task)
+
+
+## ELASTIC NET
 Elastic Net first emerged as a result of critique on lasso, whose variable selection can be too dependent on data and thus unstable.
 The solution is to combine the penalties of ridge regression and lasso to get the best of both worlds:
 ```{r, include=FALSE}

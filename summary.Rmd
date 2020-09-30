@@ -1,0 +1,21 @@
+---
+title: "Summary"
+author: "Martyna"
+date: "9/26/2020"
+output: pdf_document
+---
+
+## *Ridge Regression*
+good for multicollinearity, grouped selection
+not good for variable selection
+
+## *LASSO*
+good for variable selection
+not good for grouped selection for strongly correlated predictors
+
+## *Elastic Net*
+combine strength between Ridge Regression - and LASSO
+
+## *Regularization*
+trade bias for variance reduction
+better prediction accuracy

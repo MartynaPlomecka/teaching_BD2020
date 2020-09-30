@@ -4,7 +4,7 @@ author: "Big Data in Psychology, Martyna Płomecka"
 date: "9/30/2020"
 output: pdf_document
 ---
-
+https://colab.research.google.com/drive/1NW12Nv8Kf_U1Mlr0jyoJrC0NF8y2EasR?usp=sharing
 
 Motivation:
 In statistics, there are two critical characteristics of estimators to be considered: the bias and the variance:

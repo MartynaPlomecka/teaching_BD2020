@@ -1,0 +1,175 @@
+---
+title: "Regularization tutorial, shorter version"
+author: "Martyna"
+date: "10/1/2020"
+output: pdf_document
+---
+https://colab.research.google.com/drive/1NW12Nv8Kf_U1Mlr0jyoJrC0NF8y2EasR?usp=sharing
+
+Motivation:
+In statistics, there are two critical characteristics of estimators to be considered: the bias and the variance:
+
+Bias measures the accuracy of the estimates.
+
+Variance measures the spread, or uncertainty, in these estimates.
+
+
+Regularization - the aproach which reduces the variance at the cost of introducing some bias.
+(Almost always beneficial for the predictive performance of the model.)
+
+### Load libraries, get data & set seed for reproducibility
+```{r setup}
+set.seed(222)    # seed for reproducibility
+library(glmnet)  # for ridge regression
+library(dplyr)   # for data cleaning
+library(psych)   # for function tr() to compute trace of a matrix
+data("mtcars") #loading data
+```
+
+## RIDGE REGRESSION
+
+```{r}
+#1. RIDGE REGRESSION
+#->decreasing model complexity while keeping all variables in the model
+
+#first, centering:
+# Center y, X will be standardized in the modelling function 
+#(ridge regression assumes the predictors are standardized and the response is centered)
+y <- mtcars %>% select(mpg) %>% scale(center = TRUE, scale = FALSE) %>% as.matrix()
+X <- mtcars %>% select(-mpg) %>% as.matrix()
+```
+
+In Ridge Regression, the OLS loss function is augmented in such a way that we not only minimize the sum of squared residuals but also penalize the size of parameter estimates, in order to shrink them towards zero.
+
+
+## Choice of Regularization Parameter:
+Machine learning-like approach is to perform cross-validation and select the value of lambda that minimizes the cross-validated sum of squared residuals (or some other measure).
+This approach is focused on its predictive performance. 
+
+### Perform 10-fold cross-validation to select lambda:
+```{r}
+lambdas_to_try <- 10^seq(-3, 5, length.out = 100)
+#10-fold cross-validation to select lambda
+
+# Setting alpha = 0 implements ridge regression
+ridge_cv <- cv.glmnet(X, y, alpha = 0, lambda = lambdas_to_try,
+                      standardize = TRUE, nfolds = 10)
+#function cv.glmnet does k-fold cross-validation for glmnet, 
+#produces a plot, and returns a value for lambda
+
+
+
+# Plot cross-validation results
+plot(ridge_cv)
+# Best cross-validated lambda
+lambda_cv <- ridge_cv$lambda.min
+# Fit final model, get its sum of squared residuals and multiple R-squared
+model_cv <- glmnet(X, y, alpha = 0, lambda = lambda_cv, standardize = TRUE)
+y_hat_cv <- predict(model_cv, X)
+ssr_cv <- t(y - y_hat_cv) %*% (y - y_hat_cv) #compute a sum of squared residuals
+rsq_ridge_cv <- cor(y, y_hat_cv)^2 #Multiple R squared
+
+```
+
+### See how increasing lambda shrinks the coefficients :
+```{r}
+# Each line shows coefficients for one variables, for different lambdas.
+# The higher the lambda, the more the coefficients are shrinked towards zero.
+res <- glmnet(X, y, alpha = 0, lambda = lambdas_to_try, standardize = FALSE)
+plot(res, xvar = "lambda")
+legend("bottomright", lwd = 1, col = 1:6, legend = colnames(X), cex = .7)
+
+```
+
+## LASSO REGRESSION
+
+Lasso = Least Absolute Shrinkage and Selection Operator, is quite similar conceptually to ridge regression.
+It also adds a penalty for non-zero coefficients, but unlike ridge regression which penalizes sum of squared coefficients (the so-called L2 penalty), lasso penalizes the sum of their absolute values (L1 penalty).
+As a result, for high values of lambda, many coefficients are exactly zeroed under lasso, which is never the case in ridge regression.
+
+```{r}
+# Perform 10-fold cross-validation to select lambda
+lambdas_to_try <- 10^seq(-3, 5, length.out = 100)
+# Setting alpha = 1 implements lasso regression
+#(you can re-use the glmnet() function, but with the alpha parameter set to 1)
+lasso_cv <- cv.glmnet(X, y, alpha = 1, lambda = lambdas_to_try,
+                      standardize = TRUE, nfolds = 10)
+# Plot cross-validation results
+plot(lasso_cv)
+
+# Best cross-validated lambda
+lambda_cv <- lasso_cv$lambda.min
+# Fit final model, get its sum of squared residuals and multiple R-squared
+model_cv <- glmnet(X, y, alpha = 1, lambda = lambda_cv, standardize = TRUE)
+y_hat_cv <- predict(model_cv, X)#predict  data
+ssr_cv <- t(y - y_hat_cv) %*% (y - y_hat_cv) #compute a sum of squared residuals
+rsq_lasso_cv <- cor(y, y_hat_cv)^2 #Multiple R squared
+#(actually can be viewed as the correlation between response and the fitted values. 
+
+```
+
+
+### See how increasing lambda shrinks the coefficients:
+```{r}
+# Each line shows coefficients for one variables, for different lambdas.
+# The higher the lambda, the more the coefficients are shrinked towards zero.
+res <- glmnet(X, y, alpha = 1, lambda = lambdas_to_try, standardize = FALSE)
+plot(res, xvar = "lambda")
+legend("bottomright", lwd = 1, col = 1:6, legend = colnames(X), cex = .7)
+```
+
+Let us compare the multiple R-squared of various models we have estimated:
+
+## RIDGE VS. LASSO
+```{r}
+rsq <- cbind("R-squared" = c(rsq_ridge_cv, rsq_lasso_cv))
+rownames(rsq) <- c("ridge cross-validated", "lasso cross_validated")
+print(rsq)
+```
+
+Some more general considerations about how ridge and lasso compare:
+
+* Often neither one is overall better.
+* Lasso can set some coefficients to zero, thus performing variable selection, while ridge regression cannot.
+* Both methods allow to use correlated predictors, but they solve multicollinearity issue differently:
+* In ridge regression, the coefficients of correlated predictors are similar;
+* In lasso, one of the correlated predictors has a larger coefficient, while the rest are (nearly) zeroed.
+* Lasso tends to do well if there are a small number of significant parameters and the others are close to zero (ergo: when only a few predictors actually influence the response).
+* Ridge works well if there are many large parameters of about the same value (ergo: when most predictors impact the response).
+
+(However, in practice, we don't know the true parameter values, so the previous two points are somewhat theoretical. Just run cross-validation to select the more suited model for a specific case)
+
+
+
+(optional task)
+
+
+## ELASTIC NET
+Elastic Net first emerged as a result of critique on lasso, whose variable selection can be too dependent on data and thus unstable.
+The solution is to combine the penalties of ridge regression and lasso to get the best of both worlds:
+```{r, include=FALSE}
+library(caret)
+#Linear regression with combined L1 and L2 priors as regularizer.
+
+# Set training control
+train_control <- trainControl(method = "repeatedcv",
+                              number = 5,
+                              repeats = 5,
+                              search = "random",
+                              verboseIter = TRUE)
+
+# Train the model
+elastic_net_model <- train(mpg ~ .,
+                           data = cbind(y, X),
+                           method = "glmnet",
+                           preProcess = c("center", "scale"),
+                           tuneLength = 25,
+                           trControl = train_control)
+```
+Check multiple R-squared:
+```{r}
+y_hat_enet <- predict(elastic_net_model, X) 
+y_hat_enet
+rsq_enet <- cor(y, y_hat_enet)^2
+rsq_enet
+```
